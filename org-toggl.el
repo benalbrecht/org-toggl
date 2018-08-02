@@ -126,13 +126,23 @@ its id.")
    nil
    (cl-function
     (lambda (&key data &allow-other-keys)
-      (setq toggl-projects
-	    (seq-remove (lambda (elm) (member (cdr elm) toggl-bad-project-ids))
-			(mapcar (lambda (project)
-				  (cons (substring-no-properties (alist-get 'name project))
-					(alist-get 'id project)))
-				(alist-get 'projects (alist-get 'data data)))))
-	    (message "Toggl projects successfully downloaded.")))
+      (let ((clients (mapcar (lambda (client)
+                               (cons (alist-get 'id client)
+                                     (substring-no-properties (alist-get 'name client))))
+                             (alist-get 'clients (alist-get 'data data)))))
+        (setq toggl-projects
+              (seq-sort-by #'car #'string<
+                           (seq-remove (lambda (elm) (member (cdr elm) toggl-bad-project-ids))
+                                       (mapcar (lambda (project)
+                                                 (cons (substring-no-properties
+                                                        (decode-coding-string
+                                                         (format "%s: %s"
+                                                                 (cdr (assoc (alist-get 'cid project) clients))
+                                                                 (alist-get 'name project))
+                                                         'utf-8))
+                                                       (alist-get 'id project)))
+                                               (alist-get 'projects (alist-get 'data data)))))))
+      (message "Toggl projects successfully downloaded.")))
    (cl-function
     (lambda (&key error-thrown &allow-other-keys)
       (message "Fetching projects failed because %s" error-thrown)))))
