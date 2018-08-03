@@ -136,7 +136,7 @@ its id.")
                                        (mapcar (lambda (project)
                                                  (cons (substring-no-properties
                                                         (decode-coding-string
-                                                         (format "%s: %s"
+                                                         (format (if (equal t (alist-get 'billable project)) "%s: %s ($)" "%s: %s")
                                                                  (cdr (assoc (alist-get 'cid project) clients))
                                                                  (alist-get 'name project))
                                                          'utf-8))
