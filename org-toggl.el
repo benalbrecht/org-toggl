@@ -131,18 +131,24 @@ its id.")
                                      (substring-no-properties (alist-get 'name client))))
                              (alist-get 'clients (alist-get 'data data)))))
         (setq toggl-projects
-              (seq-sort-by #'car #'string<
-                           (seq-remove (lambda (elm) (member (cdr elm) toggl-bad-project-ids))
-                                       (mapcar (lambda (project)
-                                                 (cons (substring-no-properties
-                                                        (decode-coding-string
-                                                         (format (if (equal t (alist-get 'billable project)) "%s: %s ($)" "%s: %s")
-                                                                 (cdr (assoc (alist-get 'cid project) clients))
-                                                                 (alist-get 'name project))
-                                                         'utf-8))
-                                                       (alist-get 'id project)))
-                                               (alist-get 'projects (alist-get 'data data)))))))
-      (message "Toggl projects successfully downloaded.")))
+              (thread-last data
+                (alist-get 'data)
+                (alist-get 'projects)
+                (seq-remove (lambda (project)
+                              (or (member (alist-get 'id project) toggl-bad-project-ids)
+                                  (alist-get 'server_deleted_at project)
+                                  (not (alist-get 'active project)))))
+                (mapcar (lambda (project)
+                          (thread-first (if (equal t (alist-get 'billable project))
+                                            "%s: %s ($)"
+                                          "%s: %s")
+                            (format (cdr (assoc (alist-get 'cid project) clients))
+                                    (alist-get 'name project))
+                            (decode-coding-string 'utf-8)
+                            (substring-no-properties)
+                            (cons (alist-get 'id project)))))
+                (seq-sort-by #'car #'string<))))
+    (message "Toggl projects successfully downloaded.")))
    (cl-function
     (lambda (&key error-thrown &allow-other-keys)
       (message "Fetching projects failed because %s" error-thrown)))))
