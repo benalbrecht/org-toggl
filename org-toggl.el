@@ -115,11 +115,14 @@ Add the auth token)."
 Each project is a cons cell with car equal to its name and cdr to
 its id.")
 
+(defvar toggl-project-tasks nil
+  "A list of available project tasks.")
+
 (defvar toggl-current-time-entry nil
   "Data of the current Toggl time entry.")
 
 (defun toggl-get-projects ()
-  "Fill in `toggl-projects' (asynchronously)."
+  "Fill in `toggl-projects' and `toggl-project-tasks' (asynchronously)."
   (interactive)
   (toggl-request-get
    "me?with_related_data=true"
@@ -130,6 +133,25 @@ its id.")
                                (cons (alist-get 'id client)
                                      (substring-no-properties (alist-get 'name client))))
                              (alist-get 'clients (alist-get 'data data)))))
+        (setq toggl-project-tasks
+              (thread-last data
+                (alist-get 'data)
+                (alist-get 'tasks)
+                (seq-remove (lambda (task)
+                              (not (alist-get 'active task))))
+                (seq-group-by (lambda (task)
+                                (alist-get 'pid task)))
+                (mapcar (lambda (project)
+                          (thread-last (cdr project)
+                            (mapcar (lambda (task)
+                                      (thread-first (if (equal t (alist-get 'active task))
+                                                        "%s" "%s|||")
+                                        (format (alist-get 'name task))
+                                        (decode-coding-string 'utf-8)
+                                        (substring-no-properties)
+                                        (cons (alist-get 'id task)))))
+                            (seq-sort-by #'car #'string<)
+                            (cons (car project)))))))
         (setq toggl-projects
               (thread-last data
                 (alist-get 'data)
@@ -219,6 +241,10 @@ By default, delete the current one."
 (defun toggl-get-pid (project)
   "Get PID given PROJECT's name."
   (cdr (assoc project toggl-projects)))
+
+(defun toggl-get-tid (pid task)
+  "GET TID given TASK's name and PID of its project."
+  (cdr (assoc task (alist-get pid toggl-project-tasks))))
 
 (defcustom org-toggl-inherit-toggl-properties nil
   "Make org-toggl use property inheritance."
